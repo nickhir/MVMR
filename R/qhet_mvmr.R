@@ -183,7 +183,7 @@ qhet_mvmr <- function(r_input, pcor, CI, iterations, ncores = parallelly::availa
       ci[i] <- paste(lcb[i], ucb[i], sep = "-")
     }
 
-    res <- data.frame(b.results$t0, ci)
+    res <- data.frame(b.results$t0, lcb, ucb, ci)
 
     names(res) <- c("Effect Estimates", "95% CI")
     for (i in 1:exp.number) {
