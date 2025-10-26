@@ -9,6 +9,7 @@
 #' @param pcor A phenotypic correlation matrix including the correlation between each exposure included in the MVMR analysis.
 #' @param CI Indicates whether 95 percent confidence intervals should be calculated using a non-parametric bootstrap.
 #' @param iterations Specifies number of bootstrap iterations for calculating 95 percent confidence intervals.
+#' @param theta_null The value of the parameter under the null hypothesis
 #' @param ncores Number of cores to use for parallel processing in bootstrap. Default is `parallelly::availableCores(omit = 1)`. On Windows, this is automatically set to 1 regardless of user input. It is recommended to only set this to a maximum of `parallelly::availableCores(omit = 1)`.
 #'
 #' @return An dataframe containing effect estimates with respect to each exposure.
@@ -20,7 +21,7 @@
 #' qhet_mvmr(r_input, pcor, CI = TRUE, iterations = 1000)
 #' }
 
-qhet_mvmr <- function(r_input, pcor, CI, iterations, ncores = parallelly::availableCores(omit = 1)) {
+qhet_mvmr <- function(r_input, pcor, CI, iterations, theta_null=0, ncores = parallelly::availableCores(omit = 1)) {
   # convert MRMVInput object to mvmr_format
   if ("MRMVInput" %in% class(r_input)) {
     r_input <- mrmvinput_to_mvmr_format(r_input)
@@ -170,22 +171,36 @@ qhet_mvmr <- function(r_input, pcor, CI, iterations, ncores = parallelly::availa
     } else {
       b.results <- boot::boot(data = r_input, statistic = bootse, R = iterations)
     }
-
+    pvals <- NULL
     lcb <- NULL
     ucb <- NULL
     ci <- NULL
 
+
     for (i in 1:exp.number) {
-      boot_ci <- boot::boot.ci(b.results, type = "bca", index = i)
-      lcb[i] <- round(boot_ci$bca[4], digits = 3)
-      ucb[i] <- round(boot_ci$bca[5], digits = 3)
+      # p value calculation taken from here: https://github.com/mthulin/boot.pval/blob/main/R/boot.pval.R
+      # Create a sequence of alphas:
+      pval_precision <- 1 / b.results$R
+      alpha_seq <- seq(pval_precision, 1 - pval_precision, pval_precision)
+
+      boot_ci <- boot::boot.ci(b.results, type = "bca", index = i, conf = 1 - alpha_seq)
+      bounds <- boot_ci$bca[4:5]
+      # Find the smallest alpha such that theta_null is not contained in the 1-alpha
+      # confidence interval:
+      alpha <- alpha_seq[which.min(theta_null >= bounds[, 1] & theta_null <= bounds[, 2])]
+      pvals[i] <- alpha
+      # Extract the 5% and 95% confidence interval bounds:
+      ci_95 <- bounds[boot_ci$bca == 0.95, 4:5]
+
+      lcb[i] <- round(ci_95[1], digits = 3)
+      ucb[i] <- round(ci_95[2], digits = 3)
 
       ci[i] <- paste(lcb[i], ucb[i], sep = "-")
     }
 
-    res <- data.frame(b.results$t0, lcb, ucb, ci)
+    res <- data.frame(b.results$t0, lcb, ucb, ci, pvals)
 
-    names(res) <- c("Effect Estimates", "95% CI")
+    names(res) <- c("Effect Estimates", "Lower", "Upper", "95% CI", "pval")
     for (i in 1:exp.number) {
       rownames(res)[i] <- paste("Exposure", i, sep = " ")
     }
