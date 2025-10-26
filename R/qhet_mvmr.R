@@ -56,7 +56,7 @@ qhet_mvmr <- function(r_input, pcor, CI, iterations, theta_null=0, ncores = para
   }
 
   if (ncores > parallelly::availableCores(omit = 1)) {
-    stop('You have set the number of cores greater than the number available on the machine minus one. We recommend setting this to a maximum of parallelly::availableCores(omit = 1).')
+    warning('You have set the number of cores greater than the number available on the machine minus one. We recommend setting this to a maximum of parallelly::availableCores(omit = 1).')
   }
 
   exp.number <- length(names(r_input)[-c(1, 2, 3)]) / 2
