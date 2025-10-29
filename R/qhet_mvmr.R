@@ -171,6 +171,7 @@ qhet_mvmr <- function(r_input, pcor, CI, iterations, theta_null=0, ncores = para
     } else {
       b.results <- boot::boot(data = r_input, statistic = bootse, R = iterations)
     }
+    print("Finished bootstrapping. Now calculating confidence intervals and p-values...")
     pvals <- NULL
     lcb <- NULL
     ucb <- NULL
@@ -184,13 +185,13 @@ qhet_mvmr <- function(r_input, pcor, CI, iterations, theta_null=0, ncores = para
       alpha_seq <- seq(pval_precision, 1 - pval_precision, pval_precision)
 
       boot_ci <- boot::boot.ci(b.results, type = "bca", index = i, conf = 1 - alpha_seq)
-      bounds <- boot_ci$bca[4:5]
+      bounds <- boot_ci$bca[,4:5]
       # Find the smallest alpha such that theta_null is not contained in the 1-alpha
       # confidence interval:
-      alpha <- alpha_seq[which.min(theta_null >= bounds[, 1] & theta_null <= bounds[, 2])]
+      alpha <- alpha_seq[which.min(theta_null >= bounds[,1] & theta_null <= bounds[,2])]
       pvals[i] <- alpha
       # Extract the 5% and 95% confidence interval bounds:
-      ci_95 <- bounds[boot_ci$bca == 0.95, 4:5]
+      ci_95 <- boot_ci$bca[boot_ci$bca[,1] == 0.95, 4:5]
 
       lcb[i] <- round(ci_95[1], digits = 3)
       ucb[i] <- round(ci_95[2], digits = 3)
